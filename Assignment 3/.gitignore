@@ -3,3 +3,5 @@ MPNet-hw/results/**
 MPNet-hw/data/**
 MPNet-hw/plots/**
 
+*.gz
+
