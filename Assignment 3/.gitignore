@@ -5,3 +5,7 @@ MPNet-hw/plots/**
 
 *.gz
 
+MPNet-hw/models/**
+
+*.tar*
+
