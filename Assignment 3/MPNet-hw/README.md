@@ -1,6 +1,8 @@
 PyTorch implementation of MPnet with a pretrained model for a 2D planner.
 Code has been taken from GitHub (https://github.com/MiaoDragon/MPNet-hw) and lightly modified for the purposes of this assignment.
 
+Datasets can be downloaded from : [link1](https://drive.google.com/file/d/1isOFKVSM74lQJXd34Emz7E0KbQjRVR6z/view?usp=sharing), [link2](https://drive.google.com/file/d/13e12PdPeAVil_3U32kmybeFZWSizT7Xx/view).
+
 * mpnet_test.py:
     * for generating path plan using existing models.
     * model_path: folder of trained model (model name by default is mpnet_epoch_[number].pkl)
