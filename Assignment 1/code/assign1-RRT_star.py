@@ -1,7 +1,7 @@
 """
 Path Planning Sample Code with RRT*
 
-author: Ahmed Qureshi, code adapted from AtsushiSakai(@Atsushi_twi)
+author: Sashank Modali, code adapted from Ahmed Qureshi, which was adapted from AtsushiSakai(@Atsushi_twi)
 
 """
 
@@ -28,11 +28,11 @@ def magnitude(v):
     """
     return math.sqrt(sum([x*x for x in v]))
 
-def dist(p1, p2):
+def dist(p1, p2,angle1=0,angle2=0):
     """
     Computes the Euclidean distance (L2 norm) between two points p1 and p2
     """
-    return magnitude(diff(p1, p2))
+    return magnitude(diff(p1, p2)) + abs(angle1-angle2)
 
 class RRT():
     """
@@ -96,7 +96,7 @@ class RRT():
                 # insert newNode into the tree
                 if newParent is not None:
                     newNode.parent = newParent
-                    newNode.cost = dist(newNode.state, self.nodeList[newParent].state) + self.nodeList[newParent].cost
+                    newNode.cost = dist(newNode.state, self.nodeList[newParent].state,newNode.angle,self.nodeList[newParent].angle) + self.nodeList[newParent].cost
                 else:
                     pass # nind is already set as newNode's parent
                 self.nodeList.append(newNode)
@@ -184,7 +184,7 @@ class RRT():
                 dists[j] =dists[j]/incrementTotal
 
             numSegments = int(math.floor(incrementTotal))+1
-            angle_increment = (dest.angle - source.angle)/numSegments
+            angle_increment = (angledistTotal)/numSegments
 
             stateCurr = np.zeros(self.dof,dtype=np.float32)
             for j in range(0,self.dof):
@@ -199,7 +199,7 @@ class RRT():
 
                 for j in range(0,self.dof):
                     stateCurr.state[j] += dists[j]
-                    stateCurr.angle += angle_increment
+                stateCurr.angle += angle_increment
 
             if not self.__CollisionCheck(dest):
                 return (False, None)
@@ -249,7 +249,7 @@ class RRT():
         """
         pathLen = 0
         for i in range(1, len(path)):
-            pathLen += dist(path[i], path[i-1])
+            pathLen += dist(path[i][0], path[i-1][0],path[i][1],path[i-1][1])
 
         return pathLen
 
@@ -289,7 +289,7 @@ class RRT():
         listlen = len(self.nodeList)
 
         for i in range(listlen):
-            if dist(self.nodeList[i].state,newNode.state)<= GAMMA*(np.log(listlen)/listlen)**(1/self.dof): # check d(x, v) ≤ γ(logi/i) 1/n
+            if dist(self.nodeList[i].state,newNode.state,self.nodeList[i].angle,newNode.angle)<= GAMMA*(np.log(listlen)/listlen)**(1/(self.dof+int(self.geom=='rectangle'))): # check d(x, v) ≤ γ(logi/i) 1/n
                 nearinds.append(i); # add near_node to list
 
         return nearinds # return list
@@ -312,7 +312,7 @@ class RRT():
                 self.nodeList[i].parent = newNodeIndex
                 self.nodeList[i].cost = cost + newNode.cost
                 for j in (self.nodeList[i].children):
-                    j.cost = j.cost - cost_temp + self.nodeList[i].cost;
+                    self.nodeList[j].cost = self.nodeList[j].cost - cost_temp + self.nodeList[i].cost;
         pass
 
     def GetNearestListIndex(self, nodeList, rnd):
@@ -326,7 +326,7 @@ class RRT():
         """
         dlist = []
         for node in nodeList:
-            dlist.append(dist(rnd.state, node.state))
+            dlist.append(dist(rnd.state, node.state,rnd.angle,node.angle))
 
         minind = dlist.index(min(dlist))
 
@@ -403,7 +403,7 @@ class RRT():
             goalind = None
             mincost = float('inf')
             for idx in self.solutionSet:
-                cost = self.nodeList[idx].cost + dist(self.nodeList[idx].state, self.end.state)
+                cost = self.nodeList[idx].cost + dist(self.nodeList[idx].state, self.end.state,self.nodeList[idx].angle,self.end.angle)
                 if goalind is None or cost < mincost:
                     goalind = idx
                     mincost = cost
@@ -439,6 +439,7 @@ class RRT():
             x = [p[0][0] for p in path]
             y = [p[0][1] for p in path]
             angle = [p[1] for p in path]
+            plt.plot(x, y, '-r',linewidth=3)
 
             if self.geom=="circle":
                 for p in path:
@@ -472,7 +473,6 @@ class RRT():
                 j=0
                 plt.plot([rnd[0]+(abs(node_size[0]*0.5*project[j]) + abs(node_size[1]*0.5*project[1-j])),rnd[0]+(abs(node_size[0]*0.5*project[j]) + abs(node_size[1]*0.5*project[1-j]))],[rnd[1]-4,rnd[1]+4],':r')
                 plt.plot([rnd[0]-(abs(node_size[0]*0.5*project[j]) + abs(node_size[1]*0.5*project[1-j])),rnd[0]-(abs(node_size[0]*0.5*project[j]) + abs(node_size[1]*0.5*project[1-j]))],[rnd[1]-4,rnd[1]+4],':r')
-        plt.plot(x, y, '-r',linewidth=3)
 
         plt.plot(self.start.state[0], self.start.state[1], "xr")
         plt.plot(self.end.state[0], self.end.state[1], "xr")
@@ -538,21 +538,24 @@ def main():
     if path is None:
         print("FAILED to find a path in %.2fsec"%(endtime - starttime))
     else:
-        print("SUCCESS - found path of cost %.5f in %.2fsec"%(RRT.get_path_len([p[0] for p in path]), endtime - starttime))
+        fin_path_cost= RRT.get_path_len(path)
+        print("SUCCESS - found path of cost %.5f in %.2fsec"%(fin_path_cost, endtime - starttime))
         if args.blind:  
             with open("results/" + str(rrt.alg) +"-"+ str(rrt.geom) + ".txt",'a+') as file:
                 file.seek(0,0)
                 num_lines = sum(1 for line in file)
                 file.seek(0,2)
                 file.write("--> Trial - " + str(round(num_lines/4)+1) + " --------------------------------------------\n")
-                file.write("SUCCESS - found path of cost %.5f in %.2fsec"%(RRT.get_path_len([p[0] for p in path]), endtime - starttime)+"\n")
+                file.write("SUCCESS - found path of cost %.5f in %.2fsec"%(fin_path_cost, endtime - starttime)+"\n")
                 file.write("Path found - " + str([(round(p[0][0],2),round(p[0][1],2),str(round(p[1]*180/np.pi,2)) + u"\N{DEGREE SIGN}" ) for p in path])+"\n")
                 file.write("----------------------------------------------------------\n")
-    # Draw final path
+        # Draw final path
 
     if args.save or not args.blind:
         rrt.draw_graph()
-        plt.title("Assignment 1 - " + str(rrt.alg) +" - "+ str(rrt.geom) +"\n Sashank Modali")
+        plt.title("Assignment 1 - " + str(rrt.alg) +" - "+ str(rrt.geom) + "\n Sashank Modali")
+    if path is not None:
+        plt.title("Assignment 1 - " + str(rrt.alg) +" - "+ str(rrt.geom) + "\n Path cost - " + str(fin_path_cost) + "\n Sashank Modali")
         if args.save:
             plt.savefig("results/plot-"+str(rrt.alg) +"-"+ str(rrt.geom) + ".png")
     if not args.blind:
