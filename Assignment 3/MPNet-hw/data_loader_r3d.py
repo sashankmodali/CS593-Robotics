@@ -13,7 +13,7 @@ import math
 import gc
 
 #N=number of environments; NP=Number of Paths
-def load_train_dataset(N=100,NP=4000,folder='../data/simple/',s=0):
+def load_train_dataset(N=10,NP=2000,folder='../data/simple/',s=0):
 	# load data as [path]
 	# for each path, it is
 	# [[input],[target],[env_id]]
@@ -49,9 +49,8 @@ def load_train_dataset(N=100,NP=4000,folder='../data/simple/',s=0):
 				path=np.fromfile(fname)
 				path=path.reshape(len(path)//3,3)
 				for k in range(0,len(path)):
+					# print(N,NP,len(path),i,j,k, fname, np.shape(path), max_length)
 					paths[i][j][k]=path[k]
-
-
 
 	dataset=[]
 	targets=[]
@@ -96,33 +95,40 @@ def load_obs_list(env_id, folder='../data/simple'):
 #N=number of environments; NP=Number of Paths; s=starting environment no.; sp=starting_path_no
 #Unseen_environments==> N=10, NP=2000,s=100, sp=0
 #seen_environments==> N=100, NP=200,s=0, sp=4000
-def load_test_dataset(N=100,NP=200, s=0,sp=4000, folder='../data/simple/'):
+def load_test_dataset(N=10,NP=100, s=0,sp=2000, folder='../data/simple/',rand=False):
 	obc=np.zeros((N,10,3),dtype=np.float32)
 	temp=np.fromfile(folder+'obs.dat')
 	obs=temp.reshape(len(temp)//3,3)
-
 	temp=np.fromfile(folder+'obs_perm2.dat',np.int32)
 	perm=temp.reshape(184756,10)
+
+	envs_array=range(0,N)
+	paths_array=range(0,NP)
+	if rand==True:
+		if s==0:
+			envs_array=np.random.randint(0,10,(N,))
+		if sp==2000:
+			paths_array=np.random.randint(0,100,(NP,))
 
 	## loading obstacles
 	for i in range(0,N):
 		for j in range(0,10):
 			for k in range(0,3):
-				obc[i][j][k]=obs[perm[i+s][j]][k]
+				obc[i][j][k]=obs[perm[envs_array[i]+s][j]][k]
 
-
+	# load point cloud representation of obstacle
 	obs = []
-	k=0
-	for i in range(s,s+N):
-		temp=np.fromfile(folder+'obs_cloud/obc'+str(i)+'.dat')
+	for i in envs_array:
+		temp=np.fromfile(folder+'obs_cloud/obc'+str(i+s)+'.dat')
 		obs.append(temp)
 	obs = np.array(obs).astype(np.float32)
+
 	## calculating length of the longest trajectory
 	max_length=0
 	path_lengths=np.zeros((N,NP),dtype=np.int8)
 	for i in range(0,N):
 		for j in range(0,NP):
-			fname=folder+'e'+str(i+s)+'/path'+str(j+sp)+'.dat'
+			fname=folder+'e'+str(envs_array[i]+s)+'/path'+str(paths_array[j]+sp)+'.dat'
 			if os.path.isfile(fname):
 				path=np.fromfile(fname)
 				path=path.reshape(len(path)//3,3)
@@ -135,11 +141,11 @@ def load_test_dataset(N=100,NP=200, s=0,sp=4000, folder='../data/simple/'):
 
 	for i in range(0,N):
 		for j in range(0,NP):
-			fname=folder+'e'+str(i+s)+'/path'+str(j+sp)+'.dat'
+			fname=folder+'e'+str(envs_array[i]+s)+'/path'+str(paths_array[j]+sp)+'.dat'
 			if os.path.isfile(fname):
 				path=np.fromfile(fname)
 				path=path.reshape(len(path)//3,3)
 				for k in range(0,len(path)):
 					paths[i][j][k]=path[k]
 
-	return 	obc,obs,paths,path_lengths
+	return 	obc,obs,paths,path_lengths, envs_array, paths_array

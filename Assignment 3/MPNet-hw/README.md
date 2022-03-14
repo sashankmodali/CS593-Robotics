@@ -22,3 +22,25 @@ Datasets can be downloaded from : [link1](https://drive.google.com/file/d/1isOFK
 
 * To run: create results, models, and data folder, and put the data into data folder. Execute mpnet_test.py to generate plan.
 * Tested with python3.5.
+
+* To install dependencies :
+```
+pip install tensorboardX
+pip install crc32c
+pip install soundfile
+pip install torch torchvision torchaudio
+pip install progressbar2
+```
+
+Directory structure should be as follows:
+```
+MPNet-hw/
+    data/
+        dataset-c3d/ # To be downloaded
+        dataset-s2d/ # To be downloaded
+    Models/
+    models/
+    mpnet_train.py
+    mpnet_test.py
+    ...
+```

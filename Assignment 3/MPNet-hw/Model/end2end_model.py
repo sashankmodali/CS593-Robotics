@@ -6,7 +6,7 @@ import copy
 class End2EndMPNet(nn.Module):
     def __init__(self, total_input_size, AE_input_size, mlp_input_size, output_size, CAE, MLP):
         super(End2EndMPNet, self).__init__()
-        self.encoder = CAE.Encoder()
+        self.encoder = CAE.Encoder(AE_input_size)
         self.mlp = MLP(mlp_input_size, output_size)
         self.mse = nn.MSELoss()
         self.opt = torch.optim.Adagrad(list(self.encoder.parameters())+list(self.mlp.parameters()))

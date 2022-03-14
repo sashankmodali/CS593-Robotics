@@ -2,10 +2,13 @@
 MPNet-hw/results/**
 MPNet-hw/data/**
 MPNet-hw/plots/**
-MPNet-hw/models/**
-
+MPNet-hw/models/*.pkl
+!MPNet-hw/models/mpnet_epoch_100_s2d.pkl
+!MPNet-hw/models/mpnet_epoch_2000_r3d.pkl
 *.gz
 *.tar*
+*.json
 
 *pycache*
 
+*runs*/

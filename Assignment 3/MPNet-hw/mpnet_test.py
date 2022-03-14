@@ -8,7 +8,9 @@ import os
 import torch
 from plan_general import *
 import plan_s2d  # planning function specific to s2d environment (e.g.: collision checker, normalization)
+import plan_r3d 
 import data_loader_2d
+import data_loader_r3d
 from torch.autograd import Variable
 import copy
 import os
@@ -43,13 +45,24 @@ def main(args):
         unnormalize = utility_s2d.unnormalize
         CAE = CAE_2d
         MLP = model.MLP
+    elif args.env_type == 'r3d':
+        total_input_size = 6000+6
+        AE_input_size = 6000
+        mlp_input_size = 28+6
+        output_size = 3
+        IsInCollision = plan_r3d.IsInCollision
+        load_test_dataset = data_loader_r3d.load_test_dataset
+        normalize = utility_s2d.normalize
+        unnormalize = utility_s2d.unnormalize
+        CAE = CAE_2d
+        MLP = model.MLP
 
     mpNet = End2EndMPNet(total_input_size, AE_input_size, mlp_input_size, \
                 output_size, CAE, MLP)
     if not os.path.exists(args.model_path):
         os.makedirs(args.model_path)
     # load previously trained model if start epoch > 0
-    model_path='mpnet_epoch_%d.pkl' %(args.epoch)
+    model_path='mpnet_epoch_%d_%s.pkl' %(args.epoch,args.env_type)
     if args.epoch > 0:
         load_net_state(mpNet, os.path.join(args.model_path, model_path))
         if args.reproducible:
@@ -65,14 +78,23 @@ def main(args):
     if args.epoch > 0:
         load_opt_state(mpNet, os.path.join(args.model_path, model_path))
 
+    if not os.path.exists(args.result_path+args.part + "/" + args.env_type):
+        # create directory if not exist
+        os.makedirs(args.result_path+args.part + "/" + args.env_type)
+    
+    if args.part=="all":
+        with open(args.result_path+args.part + "/" + args.env_type +"/report-{}-{}.txt".format(str(1*args.dropout_disabled),str(1*args.lvc_disabled)), 'w') as f:
+            f.write("")
 
     # load test data
     print('loading...')
-    test_data = load_test_dataset(N=args.N, NP=args.NP, s=args.s, sp=args.sp, folder=args.data_path,rand=(args.part!=""))
+    test_data = load_test_dataset(N=args.N, NP=args.NP, s=args.s, sp=args.sp, folder=args.data_path,rand=(args.part!="" and args.part!="all"))
     obc, obs, paths, path_lengths, envs_indices, paths_indices = test_data
 
     normalize_func=lambda x: normalize(x, args.world_size)
     unnormalize_func=lambda x: unnormalize(x, args.world_size)
+
+    # print(obc, obs, paths, path_lengths, envs_indices, paths_indices)
 
     # test on dataset
     test_suc_rate = 0.
@@ -87,12 +109,21 @@ def main(args):
 
     runtimes =[]
     success_rates=[]
+    curr_success_rates=[]
+    curr_runtimes=[]
     envs = []
+    pathlens =[]
+    pathlens_rrt =[]
 
     for i in range(len(paths)):
+        curr_time = 0.0
+        curr_timesq = 0.0
         n_valid_cur = 0
         n_successful_cur = 0
+        min_curr_time = float('inf')
+        max_curr_time = -float('inf')
         results_files=""
+        pathlen_arr=[]
         for run in range(args.n_runs):
 
             widgets = [
@@ -136,38 +167,47 @@ def main(args):
                 time1 = time.time() - time0
                 sum_time += time1
                 sum_timesq += time1 * time1
+                curr_time += time1
+                curr_timesq += time1 * time1
                 min_time = min(min_time, time1)
                 max_time = max(max_time, time1)
+                min_curr_time = min(min_time, time1)
+                max_curr_time = max(max_time, time1)
 
                 # write the path
                 if type(path[0]) is not np.ndarray:
                     # it is torch tensor, convert to numpy
                     path = [p.numpy() for p in path]
                 path = np.array(path)
-                path_file = args.result_path+args.part+"/"+'env_%d/' % (envs_indices[i]+args.s)
-                if not os.path.exists(path_file):
+                path_file = args.result_path+args.part+"/{}/".format(args.env_type)+'env_%d/' % (envs_indices[i]+args.s)
+                if not os.path.exists(path_file) and args.part!="all":
                     # create directory if not exist
                     os.makedirs(path_file)
-
-                if found_path:
-                    filename = f'path_{paths_indices[j]+args.sp}-run{run+1}.txt'
-                    if run==0:
-                        results_files = results_files + args.data_path +"e{}/".format(envs_indices[i]+args.s) + "path{}.dat ".format(paths_indices[j]+args.sp)
-                    results_files = results_files + args.result_path +args.part+"/"+"env_{}/".format(envs_indices[i]+args.s) + "path_{}-run{}.txt ".format(paths_indices[j]+args.sp,run+1)
-                else:
-                    filename = f'path_{paths_indices[j]+args.sp}-run{run+1}-fail.txt'
-                np.savetxt(path_file + filename, path, fmt='%f')
+                if args.part != "all":
+                    if found_path:
+                        filename = f'path_{paths_indices[j]+args.sp}-run{run+1}.txt'
+                        if run==0:
+                            results_files = results_files + args.data_path +"e{}/".format(envs_indices[i]+args.s) + "path{}.dat ".format(paths_indices[j]+args.sp)
+                        results_files = results_files + args.result_path +args.part+"/{}/".format(args.env_type)+"env_{}/".format(envs_indices[i]+args.s) + "path_{}-run{}.txt ".format(paths_indices[j]+args.sp,run+1)
+                        pathlen_arr.append(np.sum(np.linalg.norm(path[1:] - path[0:-1],axis=1)))
+                    else:
+                        filename = f'path_{paths_indices[j]+args.sp}-run{run+1}-fail.txt'
+                    np.savetxt(path_file + filename, path, fmt='%f')
+                    # print("saved-file")
 
                 success_rate = n_successful_cur / n_valid_cur if n_valid_cur > 0 else float('nan')
 
                 if found_path:
                     bar.update(path_number=paths_indices[j]+args.sp, success_rate=success_rate, planning_time=time1)
 
-
             n_valid_total += n_valid_cur
             n_successful_total += n_successful_cur
+        avg_curr_time = curr_time / n_valid_cur if n_valid_cur > 0 else float('nan')
+        stdev_curr_time = np.sqrt((curr_timesq - curr_time * avg_curr_time) / (n_valid_cur - 1)) if n_valid_cur > 1 else 0
+        curr_success_rates.append(success_rate)
+        curr_runtimes.append([min_curr_time,max_curr_time,avg_curr_time,stdev_curr_time])
         if args.vis_dir!="":
-                subprocess.call('python visualizer.py --data-path {} --env-id {} --vis-dir {} --blind --path-file '.format(args.data_path,envs_indices[i]+args.s,args.vis_dir+args.part+"/") + results_files, shell=True)            
+            subprocess.call('python visualizer.py --data-path {} --env-id {} --vis-dir {} --blind --env-type {} --path-file '.format(args.data_path,envs_indices[i]+args.s,args.vis_dir+args.part+"/",args.env_type) + results_files, shell=True)
         if n_valid_total == 0:
             success_rate = avg_time = stdev_time = float('nan')
         else:
@@ -178,9 +218,29 @@ def main(args):
         success_rates.append(success_rate)
         runtimes.append([min_time,avg_time,max_time,stdev_time])
         envs.append(args.s + envs_indices[i])
-    lines = ["For the following environments","", str(envs),"success_rates :", str(success_rates), "", "runtimes (min/avg/max/stdev) :" , str(np.round(runtimes,2)), "", "respectively."]
-    with open(args.result_path+args.part+"/report.txt", 'w') as f:
-        f.writelines("\n".join(lines))
+        pathlens.append(np.mean(pathlen_arr))
+        pathlens_rrt.append(np.mean([path_lengths[i][j] for j in range(args.NP)]))
+
+        
+        if args.part=="all":
+            print("Done with env{}".format(i+args.s))
+            lines_all = ["",str(np.round(success_rate,2)), str(np.round(np.array(runtimes)[-1,:],2)), ""]
+            with open(args.result_path+args.part+ "/" + args.env_type+"/report-{}-{}.txt".format(str(1*args.dropout_disabled),str(1*args.lvc_disabled)), 'a+') as f:
+                f.writelines("\n".join(lines_all))
+
+    lines = ["For the following environments","", str(envs),"success rates :", str(success_rates), "", "runtimes (min/avg/max/stdev) :" , str(np.round(runtimes,2)), "", "respectively.","","The costs are compared as follows","","MPNet",str(np.round(np.array(pathlens),2)),"","RRT*",str(np.round(np.array(pathlens_rrt),2)),""]
+    
+    if args.part =="" and (args.dropout_disabled or args.lvc_disabled):
+        with open(args.result_path+args.part+"/report.txt", 'a+') as f:
+            f.writelines("\n".join(lines))
+    elif args.part!="all":
+        with open(args.result_path+args.part+"/report.txt", 'w') as f:
+            f.writelines("\n".join(lines))
+
+    # with open("{}{}/{}_cummulative_{}_{}.txt".format(args.result_path,args.part,args.env_type,str(1*args.dropout_disabled),str(1*args.lvc_disabled)),"w") as f:
+    #     f.write("Envs : {}\n".format(envs))
+    #     f.write("Cummulative success rate : {}\n".format(str(np.round((success_rate),2))))
+    #     f.write("Cummulative runtimes : {}\n".format(str(np.round(np.array([min_time,avg_time,max_time,stdev_time])),2)))
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--model-path', type=str, default='./models/',help='folder of trained model')

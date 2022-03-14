@@ -85,13 +85,14 @@ def load_obs_list(env_id, folder='../data/simple'):
 #N=number of environments; NP=Number of Paths; s=starting environment no.; sp=starting_path_no
 #Unseen_environments==> N=10, NP=2000,s=100, sp=0
 #seen_environments==> N=100, NP=200,s=0, sp=4000
-def load_test_dataset(N=100,NP=200, s=0,sp=4000, folder='../data/simple/',rand=False):
+def load_test_dataset(N=100,NP=100, s=0,sp=4000, folder='../data/simple/',rand=False):
 	# load shape representation of obstacle
 	obc=np.zeros((N,7,2),dtype=np.float32)
 	temp=np.fromfile(folder+'obs.dat')
 	obs=temp.reshape(len(temp)//2,2)
 	temp=np.fromfile(folder+'obs_perm2.dat',np.int32)
 	perm=temp.reshape(77520,7)
+	
 	envs_array=range(0,N)
 	paths_array=range(0,NP)
 	if rand==True:
@@ -99,6 +100,8 @@ def load_test_dataset(N=100,NP=200, s=0,sp=4000, folder='../data/simple/',rand=F
 			envs_array=np.random.randint(0,100,(N,))
 		if sp==4000:
 			paths_array=np.random.randint(0,100,(NP,))
+	
+	## loading obstacles
 	for i in range(0,N):
 		for j in range(0,7):
 			for k in range(0,2):

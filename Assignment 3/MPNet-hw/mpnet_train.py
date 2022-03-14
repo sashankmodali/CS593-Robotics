@@ -7,6 +7,7 @@ import argparse
 import os
 import torch
 import data_loader_2d
+import data_loader_r3d
 from torch.autograd import Variable
 import copy
 import os
@@ -39,18 +40,31 @@ def main(args):
         unnormalize = utility_s2d.unnormalize
         CAE = CAE_2d
         MLP = model.MLP
+    elif args.env_type == 'r3d':
+        total_input_size = 6000+6
+        AE_input_size = 6000
+        mlp_input_size = 28+6
+        output_size = 3
+        # IsInCollision = plan_r3d.IsInCollision
+        load_train_dataset = data_loader_r3d.load_train_dataset
+        normalize = utility_s2d.normalize
+        unnormalize = utility_s2d.unnormalize
+        CAE = CAE_2d
+        MLP = model.MLP
 
     mpNet = End2EndMPNet(total_input_size, AE_input_size, mlp_input_size, \
                         output_size, CAE, MLP)
     # setup loss
     if args.env_type == 's2d':
         loss_f = mpNet.loss
+    elif args.env_type == 'r3d':
+        loss_f = mpNet.loss
 
     if not os.path.exists(args.model_path):
         os.makedirs(args.model_path)
 
     # load previously trained model if start epoch > 0
-    model_path='mpnet_epoch_%d.pkl' %(args.start_epoch)
+    model_path='mpnet_epoch_%d_%s.pkl' %(args.start_epoch,args.env_type)
     if args.start_epoch > 0:
         load_net_state(mpNet, os.path.join(args.model_path, model_path))
         torch_seed, np_seed, py_seed = load_seed(os.path.join(args.model_path, model_path))
@@ -151,7 +165,7 @@ def main(args):
 
         # Save the models every 50 epochs
         if epoch % 50 == 0:
-            model_path='mpnet_epoch_%d.pkl' %(epoch)
+            model_path='mpnet_epoch_%d_%s.pkl' %(epoch,args.env_type)
             save_state(mpNet, torch_seed, np_seed, py_seed, os.path.join(args.model_path,model_path))
             # test
     writer.export_scalars_to_json("./all_scalars.json")
@@ -171,7 +185,7 @@ parser.add_argument('--epochs', type=int, default=500)
 parser.add_argument('--start-epoch', type=int, default=0)
 parser.add_argument('--device', type=int, default=0, help='cuda device')
 
-parser.add_argument('--env-type', type=str, default='s2d', help='s2d for simple 2d')
+parser.add_argument('--env-type', type=str, default='s2d', help='s2d for simple 2d, r3d for complex 3d.')
 parser.add_argument('--world-size', nargs='+', type=float, default=20., help='boundary of world')
 parser.add_argument('--opt', type=str, default='Adagrad')
 args = parser.parse_args()
