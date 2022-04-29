@@ -1,18 +1,14 @@
-# A 2-link arm Reach task.
+# A 2-link arm Reach task. (borrowed from https://github.com/ucsdarclab/pybullet-gym-env.git)
 
 ## Install
 
-Clone the package to your system: 
+1. Clone the package to your system.
 
-```
-git clone https://github.com/ucsdarclab/pybullet-gym-env.git
-```
+2. install it using pip:
 
-install it using pip:
-
-```
-pip install -e pybullet-gym-env/
-```
+	```
+	pip install -e pybullet-gym-env/
+	```
 
 
 ## Usage
