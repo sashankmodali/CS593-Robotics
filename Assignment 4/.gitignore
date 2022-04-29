@@ -1,0 +1,11 @@
+*.gz
+*.tar*
+*.json
+*.zip
+Continuous/modified-gym-env/pretrained_models/**
+!Continuous/modified-gym-env/pretrained_models/gaussian_ep_50_it_200_type_curr-rwd.pkl
+**/logs/**
+
+*.ipynb
+
+**/__pycache__/**
